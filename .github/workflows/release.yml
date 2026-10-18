@@ -1,0 +1,71 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '版本号（例如 v1.0.0）'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: 创建 Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 解析版本号
+        id: meta
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 收集 HAP 产物
+        id: assets
+        run: |
+          mkdir -p release-assets
+          count=0
+          for f in dist/*.hap; do
+            [ -e "$f" ] || continue
+            cp "$f" release-assets/
+            count=$((count + 1))
+          done
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+          ls -lh release-assets || true
+
+      - name: 发布
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: ${{ steps.meta.outputs.tag }}
+          generate_release_notes: true
+          fail_on_unmatched_files: false
+          files: release-assets/*.hap
+          body: |
+            ## HarmonyWeather ${{ steps.meta.outputs.tag }}
+
+            附件是**未签名**的 HAP，安装前请自行签名：
+
+            - DevEco Studio：File → Project Structure → Signing Configs → 勾选 Automatically generate signature
+            - 命令行：用 `hap-sign-tool` 配自己的 p12 / cer / p7b
+
+            安装：
+
+            ```bash
+            hdc install HarmonyWeather-unsigned.hap
+            ```
+
+            > 仓库里的 HAP 是发布时随源码一起提交的快照；如需最新构建，请本地 `hvigorw assembleHap` 后自行签名。

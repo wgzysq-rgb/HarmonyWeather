@@ -1,0 +1,40 @@
+# ---------- HarmonyOS / DevEco Studio ----------
+/.hvigor/
+/.idea/
+/local.properties
+/.preview/
+/oh_modules/
+node_modules/
+**/build/
+/.cxx/
+/.clangd
+/.clang-format
+/.clang-tidy
+**/.test/
+/.appanalyzer/
+/.gradle/
+
+# ---------- 签名材料：绝对不要提交 ----------
+*.p12
+*.p7b
+*.cer
+*.jks
+*.keystore
+signing/
+*.pem
+
+# ---------- 构建产物 ----------
+*.hap
+*.hsp
+*.app
+# 例外：dist/ 下保留未签名 HAP，供 GitHub Release 作为附件
+!dist/*.hap
+
+# ---------- 系统 / 编辑器 ----------
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+*.log
+*.tmp
+_*.txt

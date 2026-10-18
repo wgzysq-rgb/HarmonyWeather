@@ -1,0 +1,8 @@
+{
+  "modelVersion": "6.1.0",
+  "name": "harmony_weather",
+  "version": "1.0.0",
+  "description": "A Weather app UI inspired by iOS Weather, built with ArkTS/ArkUI.",
+  "dependencies": {},
+  "devDependencies": {}
+}

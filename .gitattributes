@@ -1,0 +1,13 @@
+# 统一换行，避免 Windows 上 checkout 出 CRLF
+* text=auto eol=lf
+
+# 二进制文件不要做换行转换
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.hap binary
+*.hsp binary
+*.app binary
+*.p12 binary
+*.p7b binary
+*.cer binary

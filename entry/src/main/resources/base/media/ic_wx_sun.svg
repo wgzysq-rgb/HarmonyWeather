@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">
+  <line x1="77.8" y1="50.0" x2="86.0" y2="50.0" stroke="#FFCF4A" stroke-width="6.0" stroke-linecap="round"/>
+  <line x1="69.6" y1="69.6" x2="75.5" y2="75.5" stroke="#FFCF4A" stroke-width="6.0" stroke-linecap="round"/>
+  <line x1="50.0" y1="77.8" x2="50.0" y2="86.0" stroke="#FFCF4A" stroke-width="6.0" stroke-linecap="round"/>
+  <line x1="30.4" y1="69.6" x2="24.5" y2="75.5" stroke="#FFCF4A" stroke-width="6.0" stroke-linecap="round"/>
+  <line x1="22.2" y1="50.0" x2="14.0" y2="50.0" stroke="#FFCF4A" stroke-width="6.0" stroke-linecap="round"/>
+  <line x1="30.4" y1="30.4" x2="24.5" y2="24.5" stroke="#FFCF4A" stroke-width="6.0" stroke-linecap="round"/>
+  <line x1="50.0" y1="22.2" x2="50.0" y2="14.0" stroke="#FFCF4A" stroke-width="6.0" stroke-linecap="round"/>
+  <line x1="69.6" y1="30.4" x2="75.5" y2="24.5" stroke="#FFCF4A" stroke-width="6.0" stroke-linecap="round"/>
+  <circle cx="50" cy="50" r="21" fill="#FFC02E" stroke="#FFC02E" stroke-width="1.5"/>
+</svg>

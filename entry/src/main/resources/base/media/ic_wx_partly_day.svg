@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">
+  <line x1="55.0" y1="34.0" x2="61.0" y2="34.0" stroke="#FFCF4A" stroke-width="5.0" stroke-linecap="round"/>
+  <line x1="49.4" y1="47.4" x2="53.7" y2="51.7" stroke="#FFCF4A" stroke-width="5.0" stroke-linecap="round"/>
+  <line x1="36.0" y1="53.0" x2="36.0" y2="59.0" stroke="#FFCF4A" stroke-width="5.0" stroke-linecap="round"/>
+  <line x1="22.6" y1="47.4" x2="18.3" y2="51.7" stroke="#FFCF4A" stroke-width="5.0" stroke-linecap="round"/>
+  <line x1="17.1" y1="34.0" x2="11.0" y2="34.0" stroke="#FFCF4A" stroke-width="5.0" stroke-linecap="round"/>
+  <line x1="22.6" y1="20.6" x2="18.3" y2="16.3" stroke="#FFCF4A" stroke-width="5.0" stroke-linecap="round"/>
+  <line x1="36.0" y1="15.1" x2="36.0" y2="9.0" stroke="#FFCF4A" stroke-width="5.0" stroke-linecap="round"/>
+  <line x1="49.4" y1="20.6" x2="53.7" y2="16.3" stroke="#FFCF4A" stroke-width="5.0" stroke-linecap="round"/>
+  <circle cx="36" cy="34" r="14" fill="#FFC02E" stroke="#FFC02E" stroke-width="1.5"/>
+  <circle cx="46.8" cy="70.9" r="13.8" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="62.4" cy="63.5" r="16.6" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+  <circle cx="76.2" cy="71.8" r="12.0" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+  <rect x="35.8" y="70.0" width="47.8" height="15.6" rx="7.8" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"/>
+</svg>
