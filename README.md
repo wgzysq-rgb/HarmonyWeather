@@ -6,14 +6,14 @@
 
 - **当前天气**：城市名、超大温度、天气现象、最高/最低温
 - **每小时预报**：未来 24 小时横向滚动，含天气图标与降水概率
-- **每日预报**：昨天（整行淡化到 45% 与今天区分）+ 今天 + 未来 10 天，逐日最低/最高温 + 彩色温度条（蓝→绿→黄→橙渐变）、降水概率
+- **每日预报**：昨天（文字淡化区分）+ 今天 + 未来 10 天，逐日最低/最高温 + 彩色温度条（蓝→绿→黄→橙渐变）、降水概率
 - **指标网格**：空气质量、体感温度、湿度、风、紫外线、日出日落、降水、能见度、气压、云量
 - **多城市**：左右滑动翻页切换；城市管理页每个城市是一张**带天气渐变的卡片**（城市名 / 位置 / 天气 / 空气质量 / 大温度 / 高低温），可搜索添加、**长按拖动排序**（拖动时有插入指示线，松手有位移过渡）、**左滑露出两个圆形按钮**（设为首页 / 删除）；列表第一位就是启动默认页，顺序完全由拖动决定
 - **定位**：城市面板里「使用当前位置」，申请近似位置权限后自动逆地理编码成城市名
 - **动态背景**：背景渐变随天气现象与昼夜切换（晴/多云/阴/雾/雨/暴雨/雷雨/雪），切换城市时平滑淡入
-- **毛玻璃卡片**：`backgroundBlurStyle` + 半透明白，贴合 iOS 的层次感
+- **内容卡片**：35% 黑半透明底 + `backgroundBlurStyle` 模糊，白字在浅色背景上对比度约 4:1
 - **下拉刷新**、城市列表本地持久化（preferences）
-- **桌面卡片**：2×2 与 4×4 两种尺寸，轻触打开应用，4×4 可手动刷新（见下）
+- **桌面卡片**：2×2 / 2×4 / 4×4 三种尺寸、两个模板（含 2×2 多日双栏版），轻触打开应用，4×4 可手动刷新（见下）
 
 ## 桌面卡片（服务卡片）
 
@@ -26,17 +26,7 @@
 
 目前注册**两个** form 模板（`WeatherCardDays` / `WeatherCard`），共用同一份 `formBindingData`，只是布局不同；`form_config.json` 的 `forms` 数组**按尺寸从小到大**排列 —— 先是只支持 2×2 的专用模板，再是覆盖 2×2 / 2×4 / 4×4 的通用模板（`isDefault: true`）。
 
-> **2×4 透明时钟卡片（`WeatherCardClock`）已暂时下线**，桌面添加面板不再显示。源码 `widget/pages/WidgetCardClock.ets` 保留，未被 form_config 引用时不会参与编译；恢复只需把对应的 form 条目加回数组。它的实现记录见本节下方，留作备查。
-
-**（已下线的）透明时钟卡片实现记录**：
-
-- **时间不是实时走时**：`TextTimer` 的 `count` 只在 `isCountDown: true`（倒计时）时生效，正计时需要的 `startTime` 又被标成 `@stagemodelonly`（卡片环境不可用）—— 实测在卡片里只会从 `00:00` 开始往上走。所以时间改由 FormExtensionAbility 算成 `HH:mm` 字符串传入，随 `updateDuration` 刷新（本卡片设为 `1`，即 30 分钟，是系统允许的最短周期）
-- **农历**：`i18n.getCalendar('zh-Hans-CN', 'chinese')` 取月/日，再映射成"九月初九"；失败时留空，不影响其他内容
-- **节日**：农历节日（春节/元宵/端午/七夕/中秋/重阳/腊八）查表，没有则回退到公历节日（元旦/劳动节/国庆/圣诞）
-- **点击**：整卡 `postCardAction({action:'router', abilityName:'EntryAbility'})`，只进天气应用。曾按分区跳系统时钟 / 日历（`startAbility` 打 `com.huawei.hmos.clock` / `com.huawei.hmos.calendar`），设备上返回"暂无可用打开方式"，已移除这条链路
-- **完全透明底**：`backgroundColor(Color.Transparent)`，白字靠 `textShadow`（深色、radius 8–12）在浅色壁纸上撑对比度。透明卡片**别用 `#1FFFFFFF` 这类白色半透明** —— 白壁纸下会变成整张纯白卡片、白字完全消失
-
-日期列表里「昨天」统一做淡化处理：文字降到 60% 白、图标 50% 不透明度、整行 80%，和今天/未来拉开层次。
+日期列表里「昨天」用更淡的文字色（`#B3FFFFFF` / `#99FFFFFF`）区分，温度条透明度 0.45。**不对整行做 opacity** —— 天气图标是多个圆拼出来的 SVG，半透明合成会把拼接处的缝隙放大成灰点。
 
 **卡片显示哪个城市**：固定是**首页城市（城市列表第一位）**，不跟随你在 App 里浏览的城市。原来的实现是"谁在看就写谁"，切到上海后卡片就一直停在上海、改了首页也不变。现在快照只在 `index === 0` 时写入；首页发生变化（拖动排序 / 左滑设为首页 / 删除首页）后会立刻 `formProvider.updateForm` 推一次，不用等系统 30 分钟调度。
 
@@ -161,7 +151,6 @@ entry/src/main/ets/
 ├── pages/Index.ets                   主页面：背景层 + Swiper 多城市 + 顶部按钮 + 页码点 + 城市面板
 ├── widget/pages/WidgetCard.ets       卡片 UI（独立编译单元，2×2 / 2×4 / 4×4 三套布局）
 ├── widget/pages/WidgetCardDays.ets   2×2 双栏卡片 UI（独立编译单元）
-├── widget/pages/WidgetCardClock.ets  2×4 透明时钟卡片 UI（已下线，源码保留）
 ├── model/WeatherModels.ets           全部数据结构（Wx 前缀，避免 interface 重名）
 ├── common/WeatherCode.ets            WMO 天气码 → 文案 / 图标 / 背景主题
 ├── service/
@@ -170,7 +159,6 @@ entry/src/main/ets/
 │   ├── CityStore.ets                 城市列表持久化（preferences）
 │   ├── WeatherCache.ets              天气本地缓存（30 分钟 TTL）与过期判断
 │   ├── BackgroundRefresh.ets         WorkScheduler 延迟任务的注册 / 注销
-│   ├── CalendarText.ets              公历 / 农历 / 节日文案 + 走时基准
 │   ├── WidgetSnapshot.ets            卡片快照的裁剪 / 读写 / 尺寸记忆
 │   └── LocationService.ets           定位 + 逆地理编码
 └── view/

@@ -1,5 +1,4 @@
 import { formInfo } from '@kit.FormKit';
-import { wxBuildDateText, WxDateText } from './CalendarText';
 import { WxWidgetDay, WxWidgetHour, WxWidgetSnapshot } from './WidgetSnapshot';
 
 /** 传给卡片的绑定数据，字段名必须与各卡片页面的 @LocalStorageProp 逐字一致 */
@@ -18,11 +17,6 @@ export interface WxWidgetBinding {
   layout: string;
   hours: WxWidgetHour[];
   days: WxWidgetDay[];
-  dateText: string;
-  lunarText: string;
-  festivalText: string;
-  timeText: string;
-  timeBase: number;
 }
 
 export function wxDimensionLayout(dimension: number): string {
@@ -36,7 +30,6 @@ export function wxDimensionLayout(dimension: number): string {
 }
 
 export function wxBuildWidgetBinding(snapshot: WxWidgetSnapshot, layout: string): WxWidgetBinding {
-  const dateInfo: WxDateText = wxBuildDateText(new Date());
   return {
     cityName: snapshot.cityName,
     tempText: snapshot.tempText,
@@ -50,17 +43,11 @@ export function wxBuildWidgetBinding(snapshot: WxWidgetSnapshot, layout: string)
     g2: snapshot.g2,
     layout: layout,
     hours: snapshot.hours,
-    days: snapshot.days,
-    dateText: dateInfo.dateText,
-    lunarText: dateInfo.lunarText,
-    festivalText: dateInfo.festivalText,
-    timeText: dateInfo.timeText,
-    timeBase: dateInfo.timeBase
+    days: snapshot.days
   };
 }
 
 export function wxBuildPlaceholderBinding(layout: string): WxWidgetBinding {
-  const dateInfo: WxDateText = wxBuildDateText(new Date());
   return {
     cityName: '天气',
     tempText: '--',
@@ -74,11 +61,6 @@ export function wxBuildPlaceholderBinding(layout: string): WxWidgetBinding {
     g2: '#8FC6EA',
     layout: layout,
     hours: [],
-    days: [],
-    dateText: dateInfo.dateText,
-    lunarText: dateInfo.lunarText,
-    festivalText: dateInfo.festivalText,
-    timeText: dateInfo.timeText,
-    timeBase: dateInfo.timeBase
+    days: []
   };
 }
