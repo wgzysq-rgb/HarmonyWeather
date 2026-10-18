@@ -112,6 +112,23 @@
 
 > **关于「准点」的实话**：鸿蒙上第三方 App 没有常驻后台定时器的能力（长时任务只对音视频/导航等特定类型开放）。WorkScheduler 的 `repeatCycleTime` 下限是 20 分钟，而且系统会按电量、使用频率、待机分组做**合并与延后调度**，长期不打开的 App 可能几小时才跑一次。所以"每 30 分钟一定刷新"做不到，实际是"最快 30 分钟一次，具体由系统决定"。真正实时的数据只能靠打开 App 后的下拉刷新。
 
+## 发布（GitHub Actions）
+
+`.github/workflows/release.yml`：推送 `v*` 标签、或在 Actions 页面手动触发时，自动创建 Release 并附上 `dist/` 里的 HAP。
+
+```bash
+# 1. 本地构建
+hvigorw assembleHap --mode module -p product=default --no-daemon
+cp entry/build/default/outputs/default/entry-default-unsigned.hap dist/
+
+# 2. 提交产物并打标签
+git add dist && git commit -m "build: v1.0.0"
+git tag v1.0.0
+git push origin main --tags
+```
+
+> **为什么 workflow 不编译**：GitHub 的 runner 上没有 HarmonyOS SDK（DevEco Studio 及命令行工具都要用华为账号登录才能下载），所以自动构建 HAP 做不到。workflow 只负责把 `dist/` 里已提交的 HAP 作为附件发到 Release，源码构建仍在本地完成。
+
 ## 运行
 
 本项目已用 DevEco Studio 自带的 hvigor 完整编译通过（`BUILD SUCCESSFUL`，0 error）。
