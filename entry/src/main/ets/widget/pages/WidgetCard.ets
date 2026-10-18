@@ -87,22 +87,22 @@ struct WidgetCard {
   dayRow($$: WgDayRowParam) {
     Row() {
       Text($$.day.weekday)
-        .fontSize(12)
+        .fontSize(13)
         .fontColor($$.day.isPast ? '#99FFFFFF' : '#E6FFFFFF')
-        .width(40)
+        .width(42)
       Image(wgIcon($$.day.code, true))
-        .width(17)
-        .height(17)
+        .width(18)
+        .height(18)
         .objectFit(ImageFit.Contain)
-        .opacity($$.day.isPast ? 0.5 : 1)
+        .opacity($$.day.isPast ? 0.6 : 1)
       Blank()
       Text(`${$$.day.min}°/${$$.day.max}°`)
-        .fontSize(12)
+        .fontSize(13)
         .fontColor($$.day.isPast ? '#99FFFFFF' : Color.White)
     }
     .width('100%')
-    .height(21)
-    .opacity($$.day.isPast ? 0.8 : 1)
+    .height(19)
+    .opacity($$.day.isPast ? 0.85 : 1)
   }
 
   build() {
@@ -171,7 +171,7 @@ struct WidgetCard {
               .fontColor('#E6FFFFFF')
               .maxLines(1)
             Text(this.tempText)
-              .fontSize(36)
+              .fontSize(32)
               .fontWeight(FontWeight.Medium)
               .fontColor(Color.White)
           }
@@ -200,34 +200,34 @@ struct WidgetCard {
         .width('100%')
         .alignItems(VerticalAlign.Top)
 
-        Text(this.desc)
-          .fontSize(13)
-          .fontColor(Color.White)
-          .margin({ top: 2 })
-          .width('100%')
-        Text(this.rangeText)
-          .fontSize(11)
-          .fontColor('#CCFFFFFF')
-          .margin({ top: 2 })
-          .width('100%')
+        Row({ space: 8 }) {
+          Text(this.desc)
+            .fontSize(13)
+            .fontColor(Color.White)
+          Text(this.rangeText)
+            .fontSize(12)
+            .fontColor('#B3FFFFFF')
+        }
+        .width('100%')
+        .margin({ top: 2 })
 
         Divider()
           .strokeWidth(0.5)
           .color('#33FFFFFF')
-          .margin({ top: 8, bottom: 6 })
+          .margin({ top: 6, bottom: 4 })
 
         Row() {
           ForEach(this.hourList(6), (item: WgHour) => {
-            Column({ space: 3 }) {
+            Column({ space: 2 }) {
               Text(item.label)
-                .fontSize(10)
-                .fontColor('#CCFFFFFF')
+                .fontSize(11)
+                .fontColor('#D9FFFFFF')
               Image(wgIcon(item.code, item.isDay))
-                .width(18)
-                .height(18)
+                .width(19)
+                .height(19)
                 .objectFit(ImageFit.Contain)
               Text(`${item.temp}°`)
-                .fontSize(11)
+                .fontSize(12)
                 .fontColor(Color.White)
             }
             .layoutWeight(1)
@@ -238,9 +238,9 @@ struct WidgetCard {
         Divider()
           .strokeWidth(0.5)
           .color('#33FFFFFF')
-          .margin({ top: 6, bottom: 4 })
+          .margin({ top: 5, bottom: 3 })
 
-        ForEach(this.dayList(4), (day: WgDay) => {
+        ForEach(this.dayList(6), (day: WgDay) => {
           this.dayRow({ day: day })
         }, (day: WgDay) => `dl_${day.weekday}`)
 
