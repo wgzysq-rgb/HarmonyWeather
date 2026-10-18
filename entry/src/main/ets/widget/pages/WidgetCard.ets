@@ -46,6 +46,8 @@ function wgIcon(code: number, isDay: boolean): Resource {
 
 interface WgDayRowParam {
   day: WgDay;
+  /** 4×4 里让每行均分剩余高度，2×4 保持紧凑行高 */
+  stretch: boolean;
 }
 
 let storage: LocalStorage = new LocalStorage();
@@ -64,21 +66,98 @@ struct WidgetCard {
   @LocalStorageProp('g1') g1: string = '#4E9BD8';
   @LocalStorageProp('g2') g2: string = '#8FC6EA';
   @LocalStorageProp('layout') layout: string = 'small';
-  @LocalStorageProp('hours') hours: WgHour[] = [];
-  @LocalStorageProp('days') days: WgDay[] = [];
+  @LocalStorageProp('dayTotal') dayTotal: number = 0;
+  @LocalStorageProp('dayA') dayA: string = '';
+  @LocalStorageProp('dayB') dayB: string = '';
+  @LocalStorageProp('dayC') dayC: string = '';
+  @LocalStorageProp('dayD') dayD: string = '';
+  @LocalStorageProp('dayE') dayE: string = '';
+  @LocalStorageProp('dayF') dayF: string = '';
+  @LocalStorageProp('dayG') dayG: string = '';
+  @LocalStorageProp('dayH') dayH: string = '';
+  @LocalStorageProp('hourTotal') hourTotal: number = 0;
+  @LocalStorageProp('hourA') hourA: string = '';
+  @LocalStorageProp('hourB') hourB: string = '';
+  @LocalStorageProp('hourC') hourC: string = '';
+  @LocalStorageProp('hourD') hourD: string = '';
+  @LocalStorageProp('hourE') hourE: string = '';
+  @LocalStorageProp('hourF') hourF: string = '';
+
+  /** 每项格式：星期|最低|最高|天气码|是否过去 */
+  private parseDay(raw: string): WgDay | null {
+    if (raw.length === 0) {
+      return null;
+    }
+    const parts: string[] = raw.split('|');
+    if (parts.length < 5) {
+      return null;
+    }
+    return {
+      weekday: parts[0],
+      min: Number(parts[1]),
+      max: Number(parts[2]),
+      code: Number(parts[3]),
+      isPast: parts[4] === '1'
+    };
+  }
+
+  /** 每项格式：时标|温度|天气码|是否白天 */
+  private parseHour(raw: string): WgHour | null {
+    if (raw.length === 0) {
+      return null;
+    }
+    const parts: string[] = raw.split('|');
+    if (parts.length < 4) {
+      return null;
+    }
+    return {
+      label: parts[0],
+      temp: Number(parts[1]),
+      code: Number(parts[2]),
+      isDay: parts[3] === '1'
+    };
+  }
+
+  private allDays(): WgDay[] {
+    const raw: string[] = [this.dayA, this.dayB, this.dayC, this.dayD, this.dayE, this.dayF, this.dayG, this.dayH];
+    const result: WgDay[] = [];
+    const count: number = Math.min(this.dayTotal, raw.length);
+    for (let i = 0; i < count; i++) {
+      const item: WgDay | null = this.parseDay(raw[i]);
+      if (item !== null) {
+        result.push(item);
+      }
+    }
+    return result;
+  }
+
+  private allHours(): WgHour[] {
+    const raw: string[] = [this.hourA, this.hourB, this.hourC, this.hourD, this.hourE, this.hourF];
+    const result: WgHour[] = [];
+    const count: number = Math.min(this.hourTotal, raw.length);
+    for (let i = 0; i < count; i++) {
+      const item: WgHour | null = this.parseHour(raw[i]);
+      if (item !== null) {
+        result.push(item);
+      }
+    }
+    return result;
+  }
 
   private dayList(maxCount: number): WgDay[] {
+    const all: WgDay[] = this.allDays();
     const result: WgDay[] = [];
-    for (let i = 0; i < this.days.length && i < maxCount; i++) {
-      result.push(this.days[i]);
+    for (let i = 0; i < all.length && i < maxCount; i++) {
+      result.push(all[i]);
     }
     return result;
   }
 
   private hourList(maxCount: number): WgHour[] {
+    const all: WgHour[] = this.allHours();
     const result: WgHour[] = [];
-    for (let i = 0; i < this.hours.length && i < maxCount; i++) {
-      result.push(this.hours[i]);
+    for (let i = 0; i < all.length && i < maxCount; i++) {
+      result.push(all[i]);
     }
     return result;
   }
@@ -87,22 +166,21 @@ struct WidgetCard {
   dayRow($$: WgDayRowParam) {
     Row() {
       Text($$.day.weekday)
-        .fontSize(13)
+        .fontSize(14)
         .fontColor($$.day.isPast ? '#99FFFFFF' : '#E6FFFFFF')
-        .width(42)
+        .width(48)
+      // 图标不做透明度：黄白配色的天气图标在半透明下会糊成一团灰点
       Image(wgIcon($$.day.code, true))
-        .width(18)
-        .height(18)
+        .width(19)
+        .height(19)
         .objectFit(ImageFit.Contain)
-        .opacity($$.day.isPast ? 0.6 : 1)
       Blank()
       Text(`${$$.day.min}°/${$$.day.max}°`)
-        .fontSize(13)
+        .fontSize(14)
         .fontColor($$.day.isPast ? '#99FFFFFF' : Color.White)
     }
     .width('100%')
-    .height(19)
-    .opacity($$.day.isPast ? 0.85 : 1)
+    .layoutWeight($$.stretch ? 1 : 0)
   }
 
   build() {
@@ -153,8 +231,8 @@ struct WidgetCard {
 
           Column() {
             ForEach(this.dayList(5), (day: WgDay) => {
-              this.dayRow({ day: day })
-            }, (day: WgDay) => `wd_${day.weekday}`)
+              this.dayRow({ day: day, stretch: false })
+            }, (day: WgDay) => `wd_${day.weekday}_${day.min}_${day.max}_${day.code}`)
           }
           .layoutWeight(1)
           .height('100%')
@@ -167,7 +245,7 @@ struct WidgetCard {
         Row() {
           Column({ space: 2 }) {
             Text(this.cityName)
-              .fontSize(15)
+              .fontSize(14)
               .fontColor('#E6FFFFFF')
               .maxLines(1)
             Text(this.tempText)
@@ -184,32 +262,22 @@ struct WidgetCard {
               .width(42)
               .height(42)
               .objectFit(ImageFit.Contain)
-            Image($r('app.media.ic_ui_refresh'))
-              .width(15)
-              .height(15)
-              .fillColor('#B3FFFFFF')
-              .onClick(() => {
-                postCardAction(this, {
-                  action: 'message',
-                  params: { msg: 'refresh' }
-                });
-              })
           }
           .alignItems(HorizontalAlign.End)
         }
         .width('100%')
         .alignItems(VerticalAlign.Top)
 
-        Row({ space: 8 }) {
-          Text(this.desc)
-            .fontSize(13)
-            .fontColor(Color.White)
-          Text(this.rangeText)
-            .fontSize(12)
-            .fontColor('#B3FFFFFF')
-        }
-        .width('100%')
-        .margin({ top: 2 })
+        Text(this.desc)
+          .fontSize(14)
+          .fontColor(Color.White)
+          .margin({ top: 2 })
+          .width('100%')
+        Text(this.rangeText)
+          .fontSize(13)
+          .fontColor('#CCFFFFFF')
+          .margin({ top: 4 })
+          .width('100%')
 
         Divider()
           .strokeWidth(0.5)
@@ -218,38 +286,42 @@ struct WidgetCard {
 
         Row() {
           ForEach(this.hourList(6), (item: WgHour) => {
-            Column({ space: 2 }) {
+            Column({ space: 4 }) {
               Text(item.label)
-                .fontSize(11)
+                .fontSize(14)
                 .fontColor('#D9FFFFFF')
               Image(wgIcon(item.code, item.isDay))
-                .width(19)
-                .height(19)
+                .width(20)
+                .height(20)
                 .objectFit(ImageFit.Contain)
               Text(`${item.temp}°`)
-                .fontSize(12)
+                .fontSize(14)
                 .fontColor(Color.White)
             }
             .layoutWeight(1)
-          }, (item: WgHour) => `hl_${item.label}`)
+          }, (item: WgHour) => `hl_${item.label}_${item.temp}_${item.code}`)
         }
         .width('100%')
+        .padding({ top: 2, bottom: 2 })
 
         Divider()
           .strokeWidth(0.5)
           .color('#33FFFFFF')
-          .margin({ top: 5, bottom: 3 })
+          .margin({ top: 4, bottom: 2 })
 
-        ForEach(this.dayList(6), (day: WgDay) => {
-          this.dayRow({ day: day })
-        }, (day: WgDay) => `dl_${day.weekday}`)
-
-        Blank()
+        Column() {
+          ForEach(this.dayList(5), (day: WgDay) => {
+            this.dayRow({ day: day, stretch: true })
+          }, (day: WgDay) => `dl_${day.weekday}_${day.min}_${day.max}_${day.code}`)
+        }
+        .layoutWeight(1)
+        .width('100%')
 
         Text(this.updated.length > 0 ? `更新于 ${this.updated}` : '轻触打开天气')
           .fontSize(10)
           .fontColor('#99FFFFFF')
           .width('100%')
+          .margin({ top: 2 })
       } else {
         Row() {
           Text(this.cityName)

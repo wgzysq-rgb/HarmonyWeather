@@ -1,6 +1,8 @@
 import { preferences } from '@kit.ArkData';
 import { Context } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
+import { fileIo } from '@kit.CoreFileKit';
+import { util } from '@kit.ArkTS';
 import { WxCity, WxCityWeather } from '../model/WeatherModels';
 
 const DOMAIN: number = 0x0002;
@@ -55,7 +57,7 @@ export function wxBuildWidgetSnapshot(data: WxCityWeather): WxWidgetSnapshot {
     });
   }
   const days: WxWidgetDay[] = [];
-  for (let i = 0; i < data.days.length && i < 6; i++) {
+  for (let i = 0; i < data.days.length && i < 8; i++) {
     days.push({
       weekday: data.days[i].weekday,
       min: data.days[i].min,
@@ -124,14 +126,75 @@ export function wxLoadWidgetSnapshotSync(context: Context): WxWidgetSnapshot | n
   }
 }
 
-const PREF_FORMS: string = 'wx_forms';
+/**
+ * 卡片实例的布局记录：每个 formId 一行 `formId:layout`，存在应用 files 目录。
+ *
+ * **不能用 preferences**。App 进程和 FormExtensionAbility（卡片进程）各自缓存
+ * preferences 实例，卡片进程新增 / 删除 formId 后 App 进程读不到 ——
+ * 表现为「新加的卡片永远收不到推送」「已删的卡片 id 一直残留」。
+ * 文件由两个进程共享且每次读盘，没有这个问题。
+ */
+const FORMS_FILE: string = 'wx_forms.txt';
 
-function wxFormPref(context: Context): preferences.Preferences | null {
+function formsPath(context: Context): string {
+  return `${context.filesDir}/${FORMS_FILE}`;
+}
+
+function readFormLines(context: Context): string[] {
   try {
-    return preferences.getPreferencesSync(context, { name: PREF_FORMS });
+    const path: string = formsPath(context);
+    if (!fileIo.accessSync(path)) {
+      return [];
+    }
+    const stat: fileIo.Stat = fileIo.statSync(path);
+    if (stat.size <= 0) {
+      return [];
+    }
+    const file: fileIo.File = fileIo.openSync(path, fileIo.OpenMode.READ_ONLY);
+    const buffer: ArrayBuffer = new ArrayBuffer(stat.size);
+    fileIo.readSync(file.fd, buffer);
+    fileIo.closeSync(file);
+    const text: string = util.TextDecoder.create('utf-8').decodeToString(new Uint8Array(buffer));
+    const result: string[] = [];
+    const parts: string[] = text.split('\n');
+    for (let i = 0; i < parts.length; i++) {
+      const line: string = parts[i].trim();
+      if (line.length > 0) {
+        result.push(line);
+      }
+    }
+    return result;
   } catch (error) {
-    return null;
+    hilog.warn(DOMAIN, TAG, 'read forms failed: %{public}s', (error as Error).message);
+    return [];
   }
+}
+
+function writeFormLines(context: Context, lines: string[]): void {
+  try {
+    const path: string = formsPath(context);
+    const file: fileIo.File = fileIo.openSync(path,
+      fileIo.OpenMode.CREATE | fileIo.OpenMode.WRITE_ONLY | fileIo.OpenMode.TRUNC);
+    const bytes: Uint8Array = new util.TextEncoder().encodeInto(lines.join('\n'));
+    fileIo.writeSync(file.fd, bytes.buffer);
+    fileIo.closeSync(file);
+  } catch (error) {
+    hilog.warn(DOMAIN, TAG, 'write forms failed: %{public}s', (error as Error).message);
+  }
+}
+
+function upsertFormLine(context: Context, formId: string, layout: string): void {
+  const lines: string[] = readFormLines(context);
+  const next: string[] = [];
+  const entry: string = `${formId}:${layout}`;
+  for (let i = 0; i < lines.length; i++) {
+    const key: string = lines[i].split(':')[0];
+    if (key !== formId) {
+      next.push(lines[i]);
+    }
+  }
+  next.push(entry);
+  writeFormLines(context, next);
 }
 
 /** 记住某个卡片实例的布局形态（small / wide / large），供 onUpdateForm / onFormEvent 复用 */
@@ -139,55 +202,67 @@ export function wxRememberFormLayout(context: Context, formId: string, layout: s
   if (formId.length === 0) {
     return;
   }
-  const pref: preferences.Preferences | null = wxFormPref(context);
-  if (pref === null) {
-    return;
-  }
-  try {
-    pref.putSync(formId, layout);
-    pref.flushSync();
-  } catch (error) {
-    hilog.warn(DOMAIN, TAG, 'remember layout failed: %{public}s', (error as Error).message);
-  }
+  upsertFormLine(context, formId, layout);
 }
 
 export function wxRecallFormLayout(context: Context, formId: string): string {
-  const pref: preferences.Preferences | null = wxFormPref(context);
-  if (pref === null) {
-    return 'small';
+  const lines: string[] = readFormLines(context);
+  for (let i = 0; i < lines.length; i++) {
+    const parts: string[] = lines[i].split(':');
+    if (parts.length >= 2 && parts[0] === formId) {
+      return parts[1];
+    }
   }
-  try {
-    const value: string = pref.getSync(formId, 'small') as string;
-    return value;
-  } catch (error) {
-    return 'small';
-  }
+  return 'small';
 }
 
 export function wxForgetFormLayout(context: Context, formId: string): void {
-  const pref: preferences.Preferences | null = wxFormPref(context);
-  if (pref === null) {
-    return;
+  const lines: string[] = readFormLines(context);
+  const next: string[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].split(':')[0] !== formId) {
+      next.push(lines[i]);
+    }
   }
-  try {
-    pref.deleteSync(formId);
-    pref.flushSync();
-  } catch (error) {
-    hilog.warn(DOMAIN, TAG, 'forget layout failed: %{public}s', (error as Error).message);
-  }
+  writeFormLines(context, next);
 }
 
-/** 桌面上当前存在的所有卡片实例 id（key 就是 formId） */
-export function wxLoadFormIds(context: Context): string[] {
-  const pref: preferences.Preferences | null = wxFormPref(context);
-  if (pref === null) {
-    return [];
-  }
+/** 迁移用：早期版本把 formId 存在 preferences 里，现在改文件了，首次读时搬一次 */
+const PREF_FORMS: string = 'wx_forms';
+
+function migrateFormsFromPref(context: Context): string[] {
+  const lines: string[] = [];
   try {
+    const pref: preferences.Preferences = preferences.getPreferencesSync(context, { name: PREF_FORMS });
     const all: Object = pref.getAllSync();
-    return Object.keys(all);
+    const keys: string[] = Object.keys(all);
+    for (let i = 0; i < keys.length; i++) {
+      const layout: string = pref.getSync(keys[i], 'small') as string;
+      lines.push(`${keys[i]}:${layout}`);
+    }
   } catch (error) {
-    hilog.warn(DOMAIN, TAG, 'load form ids failed: %{public}s', (error as Error).message);
-    return [];
+    hilog.warn(DOMAIN, TAG, 'migrate forms failed: %{public}s', (error as Error).message);
   }
+  return lines;
+}
+
+/** 桌面上当前存在的所有卡片实例 id */
+export function wxLoadFormIds(context: Context): string[] {
+  let lines: string[] = readFormLines(context);
+  if (lines.length === 0) {
+    const migrated: string[] = migrateFormsFromPref(context);
+    if (migrated.length > 0) {
+      writeFormLines(context, migrated);
+      lines = migrated;
+      hilog.info(DOMAIN, TAG, 'migrated %{public}d form ids to file', migrated.length);
+    }
+  }
+  const ids: string[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const key: string = lines[i].split(':')[0];
+    if (key.length > 0) {
+      ids.push(key);
+    }
+  }
+  return ids;
 }

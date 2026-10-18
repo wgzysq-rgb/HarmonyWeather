@@ -6,6 +6,8 @@ import { wxSaveWidgetSnapshot, wxBuildWidgetSnapshot, wxLoadFormIds,
   wxRecallFormLayout } from '../service/WidgetSnapshot';
 import { wxBuildWidgetBinding } from '../service/WidgetBinding';
 import { formBindingData, formProvider } from '@kit.FormKit';
+import { hilog } from '@kit.PerformanceAnalysisKit';
+import { BusinessError } from '@kit.BasicServicesKit';
 import {
   wxCacheGetSync,
   wxCacheIsFresh,
@@ -116,6 +118,12 @@ struct Index {
         this.loadCity(i, silent, false);
       }, i * 120);
     }
+
+    // 3. 启动时无条件同步一次桌面卡片。
+    //    上面「缓存新鲜就 continue」意味着 loadCity 不会被调用，
+    //    而 pushWidgetUpdate 挂在 loadCity 成功之后 —— 不补这一下，
+    //    冷启动时卡片就永远拿不到「当前首页城市」的快照。
+    this.syncHomeWidget();
   }
 
   private currentTheme(): WxTheme {
@@ -245,15 +253,25 @@ struct Index {
     }
     const formIds: string[] = wxLoadFormIds(hostContext);
     if (formIds.length === 0) {
+      hilog.warn(0x0000, 'HarmonyWeather', 'widget push skipped: no form id recorded');
       return;
     }
     const snapshot = wxBuildWidgetSnapshot(data);
+    const day0: string = snapshot.days.length > 0
+      ? `${snapshot.days[0].weekday}${snapshot.days[0].min}/${snapshot.days[0].max}` : 'none';
+    const hour0: string = snapshot.hours.length > 0
+      ? `${snapshot.hours[0].label}${snapshot.hours[0].temp}°` : 'none';
+    hilog.info(0x0000, 'HarmonyWeather',
+      'widget push city=%{public}s forms=%{public}d days=%{public}d day0=%{public}s hours=%{public}d hour0=%{public}s',
+      snapshot.cityName, formIds.length, snapshot.days.length, day0, snapshot.hours.length, hour0);
     for (let i = 0; i < formIds.length; i++) {
       const formId: string = formIds[i];
       const layout: string = wxRecallFormLayout(hostContext, formId);
       formProvider.updateForm(formId,
         formBindingData.createFormBindingData(wxBuildWidgetBinding(snapshot, layout)))
-        .catch(() => {
+        .catch((error: BusinessError) => {
+          hilog.error(0x0000, 'HarmonyWeather', 'widget push failed form=%{public}s: %{public}s',
+            formId, error.message);
         });
     }
   }

@@ -61,12 +61,52 @@ struct WidgetCardDays {
   @LocalStorageProp('g0') g0: string = '#2C6FC4';
   @LocalStorageProp('g1') g1: string = '#4E9BD8';
   @LocalStorageProp('g2') g2: string = '#8FC6EA';
-  @LocalStorageProp('days') days: WgDayItem[] = [];
+  @LocalStorageProp('dayTotal') dayTotal: number = 0;
+  @LocalStorageProp('dayA') dayA: string = '';
+  @LocalStorageProp('dayB') dayB: string = '';
+  @LocalStorageProp('dayC') dayC: string = '';
+  @LocalStorageProp('dayD') dayD: string = '';
+  @LocalStorageProp('dayE') dayE: string = '';
+  @LocalStorageProp('dayF') dayF: string = '';
+  @LocalStorageProp('dayG') dayG: string = '';
+  @LocalStorageProp('dayH') dayH: string = '';
+
+  /** 每项格式：星期|最低|最高|天气码|是否过去 */
+  private parseDay(raw: string): WgDayItem | null {
+    if (raw.length === 0) {
+      return null;
+    }
+    const parts: string[] = raw.split('|');
+    if (parts.length < 5) {
+      return null;
+    }
+    return {
+      weekday: parts[0],
+      min: Number(parts[1]),
+      max: Number(parts[2]),
+      code: Number(parts[3]),
+      isPast: parts[4] === '1'
+    };
+  }
+
+  private allDays(): WgDayItem[] {
+    const raw: string[] = [this.dayA, this.dayB, this.dayC, this.dayD, this.dayE, this.dayF, this.dayG, this.dayH];
+    const result: WgDayItem[] = [];
+    const count: number = Math.min(this.dayTotal, raw.length);
+    for (let i = 0; i < count; i++) {
+      const item: WgDayItem | null = this.parseDay(raw[i]);
+      if (item !== null) {
+        result.push(item);
+      }
+    }
+    return result;
+  }
 
   /** 今天在 days 里的下标；找不到就当 0 */
   private todayIndex(): number {
-    for (let i = 0; i < this.days.length; i++) {
-      if (this.days[i].weekday === '今天') {
+    const list: WgDayItem[] = this.allDays();
+    for (let i = 0; i < list.length; i++) {
+      if (list[i].weekday === '今天') {
         return i;
       }
     }
@@ -75,27 +115,30 @@ struct WidgetCardDays {
 
   /** 明天起的四天，与左列星期一一对应 */
   private futureDays(): WgDayItem[] {
+    const list: WgDayItem[] = this.allDays();
     const result: WgDayItem[] = [];
     const start: number = this.todayIndex() + 1;
-    for (let i = start; i < this.days.length && result.length < 4; i++) {
-      result.push(this.days[i]);
+    for (let i = start; i < list.length && result.length < 4; i++) {
+      result.push(list[i]);
     }
     if (result.length === 0) {
-      for (let i = 0; i < this.days.length && result.length < 4; i++) {
-        result.push(this.days[i]);
+      for (let i = 0; i < list.length && result.length < 4; i++) {
+        result.push(list[i]);
       }
     }
     return result;
   }
 
   private todayMax(): number {
+    const list: WgDayItem[] = this.allDays();
     const index: number = this.todayIndex();
-    return this.days.length > index ? this.days[index].max : 0;
+    return list.length > index ? list[index].max : 0;
   }
 
   private todayMin(): number {
+    const list: WgDayItem[] = this.allDays();
     const index: number = this.todayIndex();
-    return this.days.length > index ? this.days[index].min : 0;
+    return list.length > index ? list[index].min : 0;
   }
 
   build() {
@@ -123,7 +166,7 @@ struct WidgetCardDays {
             .fontColor('#E6FFFFFF')
             .height(ROW_HEIGHT)
             .width('100%')
-        }, (day: WgDayItem) => `wd_${day.weekday}`)
+        }, (day: WgDayItem) => `wd_${day.weekday}_${day.min}_${day.max}_${day.code}`)
       }
       .layoutWeight(1)
       .height('100%')
@@ -166,7 +209,7 @@ struct WidgetCardDays {
           .width('100%')
           .height(ROW_HEIGHT)
           .alignItems(VerticalAlign.Center)
-        }, (day: WgDayItem) => `rd_${day.weekday}`)
+        }, (day: WgDayItem) => `rd_${day.weekday}_${day.min}_${day.max}_${day.code}`)
       }
       .width(RIGHT_COL_WIDTH)
       .height('100%')
