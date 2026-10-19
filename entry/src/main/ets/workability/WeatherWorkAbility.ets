@@ -1,23 +1,34 @@
 import { WorkSchedulerExtensionAbility, workScheduler } from '@kit.BackgroundTasksKit';
+import { formBindingData, formProvider } from '@kit.FormKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { WxCity, WxCityWeather } from '../model/WeatherModels';
 import { WxCityStore } from '../service/CityStore';
 import { wxLoadCityWeather } from '../service/WeatherRepository';
-import { wxCachePrune, wxCachePutSync } from '../service/WeatherCache';
+import {
+  wxBuildWidgetSnapshot,
+  wxLoadFormIds,
+  wxRecallFormLayout,
+  wxSaveWidgetSnapshot,
+  WxWidgetSnapshot
+} from '../service/WidgetSnapshot';
+import { wxBuildWidgetBinding } from '../service/WidgetBinding';
 
 const DOMAIN: number = 0x0004;
 const TAG: string = 'WxWorkAbility';
-const MAX_CITIES: number = 6;
 
 /**
- * 延迟任务：系统每约 30 分钟唤醒一次，把城市列表里的天气重新拉一遍写入本地缓存。
- * 执行时长有限，因此最多刷新 6 个城市。
+ * 延迟任务：系统大约每 20 分钟唤醒一次，刷新首页城市并**直接推一次桌面卡片**。
+ *
+ * 早前它只是把结果写进 App 的本地缓存，缓存去掉之后这个产出就没有消费方了；
+ * 现在改成写卡片快照 + updateForm，至少保证用户在后台放置时卡片不会太旧。
+ * 注意：卡片本身最短只能 30 分钟自刷新一次（updateDuration 下限为 1），
+ * 想更快只能在 App 前台用 5 分钟定时器推。
  */
 export default class WeatherWorkAbility extends WorkSchedulerExtensionAbility {
   onWorkStart(work: workScheduler.WorkInfo): void {
     hilog.info(DOMAIN, TAG, 'work start, id=%{public}d', work.workId);
-    this.refreshAll().catch((error: Error) => {
-      hilog.warn(DOMAIN, TAG, 'refresh all failed: %{public}s', error.message);
+    this.refreshHome().catch((error: Error) => {
+      hilog.warn(DOMAIN, TAG, 'refresh home failed: %{public}s', error.message);
     });
   }
 
@@ -25,26 +36,26 @@ export default class WeatherWorkAbility extends WorkSchedulerExtensionAbility {
     hilog.info(DOMAIN, TAG, 'work stop, id=%{public}d', work.workId);
   }
 
-  private async refreshAll(): Promise<void> {
+  private async refreshHome(): Promise<void> {
     await WxCityStore.get().init(this.context);
     const cities: WxCity[] = await WxCityStore.get().loadCities();
-    wxCachePrune(this.context, cities);
-    const limit: number = Math.min(cities.length, MAX_CITIES);
-    const tasks: Promise<void>[] = [];
-    for (let i = 0; i < limit; i++) {
-      tasks.push(this.refreshOne(cities[i]));
+    if (cities.length === 0) {
+      return;
     }
-    await Promise.all(tasks);
-    hilog.info(DOMAIN, TAG, 'refreshed %{public}d cities', limit);
-  }
+    const data: WxCityWeather = await wxLoadCityWeather(cities[0]);
+    await wxSaveWidgetSnapshot(this.context, data);
 
-  private async refreshOne(city: WxCity): Promise<void> {
-    try {
-      const data: WxCityWeather = await wxLoadCityWeather(city);
-      wxCachePutSync(this.context, data);
-    } catch (error) {
-      hilog.warn(DOMAIN, TAG, 'refresh %{public}s failed: %{public}s', city.name,
-        (error as Error).message);
+    const formIds: string[] = wxLoadFormIds(this.context);
+    const snapshot: WxWidgetSnapshot = wxBuildWidgetSnapshot(data);
+    for (let i = 0; i < formIds.length; i++) {
+      const formId: string = formIds[i];
+      const layout: string = wxRecallFormLayout(this.context, formId);
+      formProvider.updateForm(formId,
+        formBindingData.createFormBindingData(wxBuildWidgetBinding(snapshot, layout)))
+        .catch((error: Error) => {
+          hilog.warn(DOMAIN, TAG, 'update form %{public}s failed: %{public}s', formId, error.message);
+        });
     }
+    hilog.info(DOMAIN, TAG, 'home refreshed: %{public}s, forms=%{public}d', data.city.name, formIds.length);
   }
 }

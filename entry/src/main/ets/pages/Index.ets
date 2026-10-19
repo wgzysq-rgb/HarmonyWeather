@@ -8,19 +8,13 @@ import { wxBuildWidgetBinding } from '../service/WidgetBinding';
 import { formBindingData, formProvider } from '@kit.FormKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { BusinessError } from '@kit.BasicServicesKit';
-import {
-  wxCacheGetSync,
-  wxCacheIsFresh,
-  wxCachePrune,
-  wxCachePutSync,
-  wxCacheReadMany,
-  WxCacheEntry,
-  WX_CACHE_TTL_MS
-} from '../service/WeatherCache';
 import { wxTheme } from '../common/WeatherCode';
 import { WxCityPage } from '../view/CityPage';
 import { WxCitySheet } from '../view/CitySheet';
 import { common } from '@kit.AbilityKit';
+
+/** 前台自动刷新周期：5 分钟。App 停在前台时，靠它保证数据不会「看着看着就旧了」 */
+const AUTO_REFRESH_MS: number = 5 * 60 * 1000;
 
 @Entry
 @Component
@@ -53,24 +47,31 @@ struct Index {
   }
 
   /**
-   * 前台每 5 分钟检查一次当前城市是否该刷新。
-   * 之前只有 onPageShow 触发，App 一直停在页面里就永远不会更新。
+   * 前台每 5 分钟强制刷新一次：当前城市 + 首页（首页同时驱动桌面卡片）。
+   * 早前这里调的是 refreshIfStale（按缓存新鲜度判断），缓存没到期的城市会被跳过，
+   * 表现出来就是「App 一直开着却永不更新」。
    */
   private startTick(): void {
     if (this.tickTimer >= 0) {
       return;
     }
     this.tickTimer = setInterval(() => {
-      this.refreshIfStale(this.currentIndex);
-    }, 5 * 60 * 1000);
+      this.loadCity(this.currentIndex, true, true);
+      if (this.currentIndex !== 0) {
+        this.loadCity(0, true, true);
+      }
+    }, AUTO_REFRESH_MS);
   }
 
-  /** 从后台回到前台时，只有数据已过期才补一次静默刷新 */
+  /** 回到前台：立刻刷新，不等定时器 */
   onPageShow(): void {
     if (!this.started) {
       return;
     }
-    this.refreshIfStale(this.currentIndex);
+    this.loadCity(this.currentIndex, true, true);
+    if (this.currentIndex !== 0) {
+      this.loadCity(0, true, true);
+    }
   }
 
   private async bootstrap(): Promise<void> {
@@ -80,50 +81,30 @@ struct Index {
     }
     const stored: WxCity[] = await WxCityStore.get().loadCities();
 
-    // 1. 先同步铺本地缓存，进入即有内容，不转圈
-    const cachedMap: Map<string, WxCacheEntry> = context !== undefined
-      ? wxCacheReadMany(context, stored)
-      : new Map<string, WxCacheEntry>();
-    const seedWeathers: Array<WxCityWeather | null> = [];
-    const seedFlags: boolean[] = [];
-    const seedErrors: string[] = [];
-    const seedLoadedAt: number[] = [];
+    // 不做本地缓存：首屏直接空着转圈，等真实请求回来。
+    // 之前读缓存铺首屏，30 分钟内的旧数据会「看起来像刷新过了」，是长期不更新的主要来源。
+    const blankWeathers: Array<WxCityWeather | null> = [];
+    const blankFlags: boolean[] = [];
+    const blankErrors: string[] = [];
+    const blankLoadedAt: number[] = [];
     for (let i = 0; i < stored.length; i++) {
-      const entry: WxCacheEntry | null = cachedMap.get(stored[i].id) ?? null;
-      seedWeathers.push(entry !== null ? entry.weather : null);
-      seedFlags.push(false);
-      seedErrors.push('');
-      seedLoadedAt.push(entry !== null ? entry.savedAt : 0);
+      blankWeathers.push(null);
+      blankFlags.push(false);
+      blankErrors.push('');
+      blankLoadedAt.push(0);
     }
     this.cities = stored;
-    this.weathers = seedWeathers;
-    this.loadingList = seedFlags;
-    this.errorList = seedErrors;
-    this.loadedAt = seedLoadedAt;
+    this.weathers = blankWeathers;
+    this.loadingList = blankFlags;
+    this.errorList = blankErrors;
+    this.loadedAt = blankLoadedAt;
     this.booting = false;
     this.started = true;
 
-    if (context !== undefined) {
-      wxCachePrune(context, stored);
-    }
-
-    // 2. 把后面几页一起预取，滑过去就不用再等；缓存还新鲜的跳过
+    // 所有城市并发拉一遍；城市数量很少，换来「进来就是最新」
     for (let i = 0; i < stored.length; i++) {
-      const entry: WxCacheEntry | null = cachedMap.get(stored[i].id) ?? null;
-      if (entry !== null && wxCacheIsFresh(entry)) {
-        continue;
-      }
-      const silent: boolean = entry !== null;
-      setTimeout(() => {
-        this.loadCity(i, silent, false);
-      }, i * 120);
+      this.loadCity(i, false, true);
     }
-
-    // 3. 启动时无条件同步一次桌面卡片。
-    //    上面「缓存新鲜就 continue」意味着 loadCity 不会被调用，
-    //    而 pushWidgetUpdate 挂在 loadCity 成功之后 —— 不补这一下，
-    //    冷启动时卡片就永远拿不到「当前首页城市」的快照。
-    this.syncHomeWidget();
   }
 
   private currentTheme(): WxTheme {
@@ -160,29 +141,18 @@ struct Index {
    * @param silent 静默刷新：不显示 loading，失败时保留旧数据
    * @param force  忽略缓存强制请求（仅下拉刷新用）
    */
+  /**
+   * 拉取某个城市的最新天气。
+   *
+   * 这里不再读本地缓存 —— 早前「缓存 30 分钟内就跳过请求」是长期不刷新的根源：
+   * 页面、卡片、后台任务各写各的缓存，谁也说不清手上是不是最新的。
+   * `force` 参数保留只为兼容旧调用点，现在一律走网络。
+   */
   private async loadCity(index: number, silent: boolean = false, force: boolean = false): Promise<void> {
     if (index < 0 || index >= this.cities.length) {
       return;
     }
     const city: WxCity = this.cities[index];
-    const hostContext = this.getUIContext().getHostContext();
-
-    // 缓存还新鲜就不发请求
-    if (!force && hostContext !== undefined) {
-      const cached: WxCacheEntry | null = wxCacheGetSync(hostContext, city.id);
-      if (cached !== null && wxCacheIsFresh(cached)) {
-        const nextWeathers: Array<WxCityWeather | null> = this.weathers.slice();
-        nextWeathers[index] = cached.weather;
-        this.weathers = nextWeathers;
-        this.markLoaded(index, cached.savedAt);
-        this.setFlag(index, false, '');
-        if (index === 0) {
-          this.syncWidget(cached.weather);
-          this.pushWidgetUpdate();
-        }
-        return;
-      }
-    }
 
     if (!silent) {
       this.setFlag(index, true, '');
@@ -191,9 +161,6 @@ struct Index {
     }
     try {
       const data: WxCityWeather = await wxLoadCityWeather(city);
-      if (hostContext !== undefined) {
-        wxCachePutSync(hostContext, data);
-      }
       const nextWeathers: Array<WxCityWeather | null> = this.weathers.slice();
       nextWeathers[index] = data;
       this.weathers = nextWeathers;
@@ -276,33 +243,13 @@ struct Index {
     }
   }
 
+  /** 切到某一页：没数据就带 loading 拉，有数据也静默拉一次最新的 */
   private ensureLoaded(index: number): void {
     if (index < 0 || index >= this.cities.length) {
       return;
     }
     const existing: WxCityWeather | null = this.weathers[index] ?? null;
-    if (existing === null) {
-      this.loadCity(index, false, false);
-      return;
-    }
-    this.refreshIfStale(index);
-  }
-
-  /**
-   * 按内存里的加载时间判断是否该刷新。
-   * 不用 preferences 的 savedAt 做依据 —— 卡片和后台任务是别的进程写缓存，
-   * 本进程的 preferences 实例读不到它们的更新，会导致「明明该刷新却一直等」。
-   */
-  private refreshIfStale(index: number): void {
-    if (index < 0 || index >= this.cities.length) {
-      return;
-    }
-    const lastAt: number = this.loadedAt[index] ?? 0;
-    const age: number = Date.now() - lastAt;
-    // age < 0 说明本机时间被往回改过，同样按过期处理，避免一直不刷新
-    if (age < 0 || age >= WX_CACHE_TTL_MS) {
-      this.loadCity(index, true, false);
-    }
+    this.loadCity(index, existing !== null, true);
   }
 
   private markLoaded(index: number, at: number): void {

@@ -4,7 +4,6 @@ import { hilog } from '@kit.PerformanceAnalysisKit';
 import { WxCity, WxCityWeather } from '../model/WeatherModels';
 import { wxLoadCityWeather } from '../service/WeatherRepository';
 import { WxCityStore } from '../service/CityStore';
-import { wxCachePutSync } from '../service/WeatherCache';
 import {
   wxBuildWidgetSnapshot,
   wxForgetFormLayout,
@@ -84,8 +83,6 @@ export default class EntryFormAbility extends FormExtensionAbility {
       }
       const data: WxCityWeather = await wxLoadCityWeather(city);
       await wxSaveWidgetSnapshot(this.context, data);
-      // 顺带把 App 内的本地缓存一起刷新，卡片拉过一次后进应用也不用再等
-      wxCachePutSync(this.context, data);
       const fresh: WxWidgetSnapshot = wxBuildWidgetSnapshot(data);
       await formProvider.updateForm(formId,
         formBindingData.createFormBindingData(wxBuildWidgetBinding(fresh, layout)));

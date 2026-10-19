@@ -8,11 +8,10 @@ const WORK_ID: number = 4101;
 const WORK_ABILITY: string = 'WeatherWorkAbility';
 
 /**
- * 后台刷新周期：30 分钟。
- * WorkScheduler 的 repeatCycleTime 下限是 20 分钟，且系统会按电量/使用频率做合并调度，
- * 实际触发时间可能晚于这个值（不保证准点）。
+ * 后台刷新周期：20 分钟（WorkScheduler 的 repeatCycleTime 下限，再小系统不接受）。
+ * 系统会按电量 / 使用频率合并调度，实际触发可能晚于这个值，不保证准点。
  */
-const CYCLE_MS: number = 30 * 60 * 1000;
+const CYCLE_MS: number = 20 * 60 * 1000;
 
 export function wxRegisterBackgroundRefresh(context: common.UIAbilityContext): void {
   try {
