@@ -215,7 +215,7 @@ export struct WxMetricsGrid {
             .backgroundBlurStyle(BlurStyle.Thin)
           }
           .height(112)
-        }, (entry: WxMetricEntry) => entry.id)
+        }, (entry: WxMetricEntry) => `${entry.id}_${entry.value}_${entry.sub}`)
       }
       .columnsTemplate('1fr 1fr')
       .columnsGap(12)

@@ -360,6 +360,7 @@ export struct WxCitySheet {
 
       if (this.results.length > 0) {
         List() {
+          // check-invariants: skip=搜索结果只显示城市名与行政区别名，不含天气数据
           ForEach(this.results, (city: WxCity) => {
             ListItem() {
               this.resultRow(city)
@@ -420,7 +421,7 @@ export struct WxCitySheet {
           .onClick(() => {
             this.onPick(item.city);
           })
-        }, (item: WxCityCardItem) => `city_${item.city.id}`)
+        }, (item: WxCityCardItem) => `city_${item.city.id}_${item.temp}_${item.code}_${item.rangeText}`)
       }
       .layoutWeight(1)
       .width('100%')

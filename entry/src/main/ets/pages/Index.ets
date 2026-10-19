@@ -612,6 +612,7 @@ struct Index {
   @Builder
   pageDots() {
     Row({ space: 6 }) {
+      // check-invariants: skip=只画页码圆点，不依赖天气数据
       ForEach(this.cities, (city: WxCity, index: number) => {
         Circle()
           .width(index === this.currentIndex ? 7 : 6)
@@ -640,7 +641,7 @@ struct Index {
           .linearGradient({ angle: 180, colors: this.gradientOf(index) })
           .opacity(index === this.currentIndex ? 1 : 0)
           .animation({ duration: 480, curve: Curve.EaseInOut })
-      }, (city: WxCity) => `bg_${city.id}`)
+      }, (city: WxCity, index: number) => `bg_${city.id}_${this.weathers[index]?.theme.key ?? 'none'}`)
 
       Circle({ width: 300, height: 300 })
         .fill('#12FFFFFF')
@@ -652,6 +653,7 @@ struct Index {
         this.bootView()
       } else {
         Swiper(this.swiperController) {
+          // check-invariants: skip=weather 通过 @Prop 传入，父组件重渲染即更新，不依赖 key
           ForEach(this.cities, (city: WxCity, index: number) => {
             WxCityPage({
               weather: this.weathers[index] ?? null,

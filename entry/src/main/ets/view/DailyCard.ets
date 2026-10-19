@@ -134,7 +134,7 @@ export struct WxDailyCard {
           .alignItems(VerticalAlign.Center)
         }
         .width('100%')
-      }, (day: WxDayPoint) => day.key)
+      }, (day: WxDayPoint) => `${day.key}_${day.min}_${day.max}_${day.code}_${day.pop}`)
 
       Row()
         .height(8)

@@ -61,7 +61,7 @@ export struct WxHourlyCard {
               width: { left: 0.5 },
               color: index === 0 ? '#00FFFFFF' : '#26FFFFFF'
             })
-          }, (item: WxHourPoint) => item.key)
+          }, (item: WxHourPoint) => `${item.key}_${item.temp}_${item.code}_${item.pop}`)
         }
         .padding({ left: 4, right: 4 })
       }
